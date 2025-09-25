@@ -11,7 +11,7 @@ _model_instance = DelayModel()
 if os.getenv("LOAD_MODEL", "false").lower() in {"1", "true", "yes"}:
     try:
         from joblib import load
-        model_path = os.getenv("MODEL_PATH", "artifacts/model.joblib")
+        model_path = os.getenv("MODEL_PATH", "challenge/artifacts/model.joblib")
         _model_instance._model = load(model_path)
     except Exception:
         # Keep unfitted model if loading fails
@@ -30,7 +30,7 @@ async def post_predict(payload: dict) -> dict:
         raise HTTPException(status_code=400)
 
     flights = payload["flights"]
-    allowed_opera = {"Aerolineas Argentinas"}
+    allowed_opera = {"Aerolineas Argentinas", "Grupo LATAM"}
     allowed_tipo = {"I", "N"}
 
     for f in flights:

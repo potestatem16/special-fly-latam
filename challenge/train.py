@@ -21,7 +21,7 @@ def main() -> None:
     model = DelayModel()
     X, y = model.preprocess(df, target_column="delay")
     model.fit(X, y)
-    dump(model._model, "artifacts/model.joblib")
+    dump(model._model, os.path.join(os.path.dirname(__file__), "artifacts", "model.joblib"))
 
 
 if __name__ == "__main__":
