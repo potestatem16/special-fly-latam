@@ -93,3 +93,43 @@
   - Predictions are integers; unfitted fallback returns zeros.
   - Typing error fixed.
   - Model tests: `4 passed`.
+
+## Part II - API operationalization notes
+
+- Endpoints implemented in `challenge/api.py` (exposed as `challenge.app`):
+  - `GET /health` → `{"status":"OK"}`.
+  - `POST /predict` expects body: `{"flights": [{"OPERA": str, "TIPOVUELO": "I"|"N", "MES": 1..12}, ...]}`.
+- Minimal validation (per tests):
+  - `OPERA` must be in allowlist: `{ "Aerolineas Argentinas" }`.
+  - `TIPOVUELO` ∈ {`I`, `N`}.
+  - `MES` integer in [1..12].
+  - Any violation → HTTP 400.
+- Serving behavior:
+  - Builds a DataFrame from `flights`, calls `DelayModel.preprocess` and `DelayModel.predict`.
+  - No training at startup; unfitted model returns zeros, matching `tests/api/test_api.py` expectations.
+- How to run API tests:
+  - `cd tests`
+  - `python -m pytest -q api/test_api.py`
+
+## Part III - Train artifact and Docker notes
+
+- Artifacts:
+  - Trained estimator saved as `artifacts/model.joblib`.
+- Training:
+  - `pip install -r requirements.txt`
+  - `python scripts/train.py`
+  - Set `usecols` to just `["Fecha-I","Fecha-O","OPERA","TIPOVUELO","MES"]` and `low_memory=False` in `scripts/train.py`. This removes the DtypeWarning and speeds up parsing by avoiding chunked type inference and reading only necessary columns.
+
+- Runtime toggle:
+  - `LOAD_MODEL=true` and optional `MODEL_PATH=/app/artifacts/model.joblib`.
+- Docker (prod):
+  - Build: `docker build -t delay-api .`
+  - Run: `docker run -p 8080:8080 -e LOAD_MODEL=false delay-api`
+  - Health: GET `http://localhost:8080/health`
+
+## Part IV - CI/CD notes
+
+- CI at `.github/workflows/ci.yml` runs model and API tests on push/PR to `main`.
+- CD at `.github/workflows/cd.yml` builds and deploys to Cloud Run. Requires secrets:
+  - `GCP_PROJECT`, `GCP_SA_KEY`.
+- After deploy, update `Makefile` `STRESS_URL` with the service URL and run `make stress-test`.
