@@ -1,3 +1,4 @@
+# .github/workflows/cd.yml
 name: Continuous Delivery
 
 on:
@@ -23,15 +24,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Auth & gcloud
+      # Authenticates with the service account JSON key
+      - name: Google Auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      # Installs gcloud CLI using current credentials
+      - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.GCP_PROJECT }}
-          service_account_key: ${{ secrets.GCP_SA_KEY }}
-          export_default_credentials: true
 
+      # Configures Docker helper for Artifact Registry and performs explicit login
       - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
+        run: |
+          gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
+          echo '${{ secrets.GCP_SA_KEY }}' | docker login -u _json_key --password-stdin https://${{ env.GCP_REGION }}-docker.pkg.dev
 
       - name: Build image
         run: docker build -t $IMAGE .
