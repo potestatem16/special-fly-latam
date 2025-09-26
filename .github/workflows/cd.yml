@@ -47,7 +47,7 @@ jobs:
             --platform managed \
             --allow-unauthenticated \
             --port 8080 \
-            --set-env-vars LOAD_MODEL=true,MODEL_PATH=/app/artifacts/model.joblib
+            --set-env-vars LOAD_MODEL=true,MODEL_PATH=/app/challenge/artifacts/model.joblib
 
       - name: Get URL
         id: url
