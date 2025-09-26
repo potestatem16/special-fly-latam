@@ -48,6 +48,19 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 
+# pytest / coverage
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# reports generados por Makefile/pytest/locust
+reports/
+reports/**
+
+# artefactos varios
+*.log
+
 # Type checkers / linters
 .mypy_cache/
 .pyre/
@@ -97,5 +110,4 @@ db.sqlite3
 *.pickle
 *.pkl
 .benchmarks/
-
 
