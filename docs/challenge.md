@@ -47,17 +47,63 @@
   - `LOAD_MODEL=true` and optional `MODEL_PATH=/app/challenge/artifacts/model.joblib`.
 - Docker (prod):
   - Build: `docker build -t delay-api .`
-  - Run: `docker run -p 8000:8000 -e LOAD_MODEL=false delay-api`
-  - Health: GET `http://localhost:8000/health`
+  - Run: `docker run -p 8080:8080 -e LOAD_MODEL=false delay-api`
+  - Health: GET `http://localhost:8080/health`
+- **Deployed API**: https://delay-api-f2yp47iw6q-uc.a.run.app
 
-## Part IV - CI/CD notes
+## Part IV - CI/CD Implementation with GitFlow and GitHub Actions
 
-- Added `.coveragerc` at the repo root to match the `--cov-config=../.coveragerc` argument used by the Makefile and pytest commands. 
-- `pytest.ini` remains at the repo root to ensure pytest runs from the root directory, sets `pythonpath=.` and uses `-q` for quiet output.
-- CI at `.github/workflows/ci.yml` runs model and API tests on push/PR to `main`.
-- CD at `.github/workflows/cd.yml` builds and deploys to Cloud Run. Requires secrets:
-  - `GCP_PROJECT`, `GCP_SA_KEY`.
-- After deploy, update `Makefile` `STRESS_URL` with the service URL and run `make stress-test`.
+### GitFlow Workflow
+- **main branch**: Production-ready code, triggers automatic deployment
+- **dev branch**: Development branch for feature integration
+- **Feature branches**: Created from dev for individual features
+
+### CI/CD Pipeline
+
+#### Continuous Integration (`.github/workflows/ci.yml`)
+- **Triggers**: Push/PR to `main` branch
+- **Environment**: Ubuntu latest with Python 3.11
+- **Steps**:
+  1. Checkout code
+  2. Setup Python environment
+  3. Install dependencies (`requirements-test.txt`, `requirements.txt`)
+  4. Run model tests (`tests/model/test_model.py`)
+  5. Run API tests (`tests/api/test_api.py`)
+- **Status**: ✅ All tests passing
+
+#### Continuous Deployment (`.github/workflows/cd.yml`)
+- **Triggers**: Push to `main` branch only
+- **Environment**: Ubuntu latest with GCP authentication
+- **Steps**:
+  1. Checkout code
+  2. Authenticate with GCP using service account JSON
+  3. Setup gcloud CLI
+  4. Configure Docker for Artifact Registry
+  5. Build Docker image with commit SHA tag
+  6. Push image to Google Artifact Registry
+  7. Deploy to Cloud Run with:
+     - Port: 8080
+     - Environment: `LOAD_MODEL=true`, `MODEL_PATH=/app/challenge/artifacts/model.joblib`
+     - Public access enabled
+- **Deployed URL**: https://delay-api-f2yp47iw6q-uc.a.run.app
+
+### Configuration Files
+- **`.coveragerc`**: Coverage configuration for test reports
+- **`pytest.ini`**: Pytest settings (quiet output, Python path)
+- **Required Secrets**:
+  - `GCP_PROJECT`: Google Cloud Project ID
+  - `GCP_SA_KEY`: Service Account JSON key for authentication
+  - `SERVICE_NAME`: Cloud Run service name (default: delay-api)
+  - `GCP_REGION`: Deployment region (default: us-central1)
+  - `AR_REPO`: Artifact Registry repository (default: ml-api)
+
+### Deployment Process
+1. **Development**: Work on `dev` branch
+2. **Testing**: CI runs automatically on PRs to `main`
+3. **Merge**: Merge `dev` → `main` when ready
+4. **Deploy**: CD automatically deploys to Cloud Run
+5. **Verify**: API available at deployed URL
+6. **Stress Test**: Update `STRESS_URL` in Makefile and run `make stress-test`
 
 
 ## Windows PowerShell run steps
@@ -71,9 +117,11 @@
   - `make api-test`
 - Train and persist model:
   - `python .\challenge\train.py`
-- Run API in Docker on port 8000:
+- Run API in Docker on port 8080:
   - `docker build -t delay-api .`
-  - `docker run -p 8000:8000 -e LOAD_MODEL=false delay-api`
-  - `Invoke-WebRequest http://127.0.0.1:8000/health | Select-Object -ExpandProperty Content`
-- Stress test (update `STRESS_URL` in `Makefile` when deployed):
-  - `make stress-test`
+  - `docker run -p 8080:8080 -e LOAD_MODEL=false delay-api`
+  - `Invoke-WebRequest http://127.0.0.1:8080/health | Select-Object -ExpandProperty Content`
+- Stress test:
+  - Local: `Invoke-WebRequest http://127.0.0.1:8080/health | Select-Object -ExpandProperty Content`
+  - Deployed: `Invoke-WebRequest https://delay-api-f2yp47iw6q-uc.a.run.app/health | Select-Object -ExpandProperty Content`
+  - `make stress-test` (STRESS_URL configured for deployed Cloud Run URL in Makefile)
