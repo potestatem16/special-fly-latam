@@ -5,44 +5,64 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+env:
+  SERVICE_NAME: ${{ secrets.SERVICE_NAME || 'delay-api' }}
+  GCP_PROJECT:  ${{ secrets.GCP_PROJECT || 'latam-challenge-473223' }}
+  GCP_REGION:   ${{ secrets.GCP_REGION  || 'us-central1' }}
+  AR_REPO:      ${{ secrets.AR_REPO     || 'ml-api' }}
+  IMAGE:        ${{ secrets.GCP_REGION  || 'us-central1' }}-docker.pkg.dev/${{ secrets.GCP_PROJECT || 'latam-challenge-473223' }}/${{ secrets.AR_REPO || 'ml-api' }}/${{ secrets.SERVICE_NAME || 'delay-api' }}:${{ github.sha }}
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
-    env:
-      SERVICE_NAME: delay-api
-      REGION: us-central1
-      IMAGE: gcr.io/${{ secrets.GCP_PROJECT }}/delay-api:${{ github.sha }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up gcloud
+      - name: Auth & gcloud
         uses: google-github-actions/setup-gcloud@v2
         with:
-          project_id: ${{ secrets.GCP_PROJECT }}
+          project_id: ${{ env.GCP_PROJECT }}
           service_account_key: ${{ secrets.GCP_SA_KEY }}
           export_default_credentials: true
 
-      - name: Configure Docker auth
-        run: gcloud auth configure-docker --quiet
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
 
       - name: Build image
-        run: |
-          docker build -t $IMAGE .
+        run: docker build -t $IMAGE .
 
       - name: Push image
-        run: |
-          docker push $IMAGE
+        run: docker push $IMAGE
 
       - name: Deploy to Cloud Run
         run: |
-          gcloud run deploy $SERVICE_NAME \
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
             --image $IMAGE \
-            --region $REGION \
+            --region ${{ env.GCP_REGION }} \
             --platform managed \
             --allow-unauthenticated \
             --port 8080 \
             --set-env-vars LOAD_MODEL=true,MODEL_PATH=/app/artifacts/model.joblib
+
+      - name: Get URL
+        id: url
+        run: |
+          URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.GCP_REGION }} --format='value(status.url)')
+          echo "url=$URL" >> $GITHUB_OUTPUT
+
+      - name: Print URL
+        run: echo "Cloud Run URL: ${{ steps.url.outputs.url }}"
+
+      - name: Job Summary
+        run: |
+          echo "### ✅ Deployed to Cloud Run" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Service: **${{ env.SERVICE_NAME }}**" >> $GITHUB_STEP_SUMMARY
+          echo "- Region: **${{ env.GCP_REGION }}**" >> $GITHUB_STEP_SUMMARY
+          echo "- Image: **${{ env.IMAGE }}**" >> $GITHUB_STEP_SUMMARY
+          echo "- URL: **${{ steps.url.outputs.url }}**" >> $GITHUB_STEP_SUMMARY
