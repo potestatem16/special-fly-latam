@@ -56,7 +56,8 @@ jobs:
           echo "url=$URL" >> $GITHUB_OUTPUT
 
       - name: Print URL
-        run: echo "Cloud Run URL: ${{ steps.url.outputs.url }}"
+        run: |
+          echo "Cloud Run URL: ${{ steps.url.outputs.url }}"
 
       - name: Job Summary
         run: |
